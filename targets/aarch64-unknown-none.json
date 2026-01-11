@@ -1,0 +1,14 @@
+{
+  "llvm-target": "aarch64-unknown-none",
+  "arch": "aarch64",
+  "os": "none",
+  "vendor": "none",
+  "env": "",
+  "executables": true,
+  "linker-flavor": "ld.lld",
+  "linker": "rust-lld",
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "code-model": "small",
+  "eliminate-frame-pointer": false
+}

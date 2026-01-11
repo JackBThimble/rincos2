@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+  "kernel",
+  "crates/bootabi",
+  "crates/bootloader/limine",
+  "arch/x86_64",
+  "arch/aarch64",
+]
+
+default-members = ["kernel"]

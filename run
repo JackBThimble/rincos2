@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+
+cargo +nightly build --features x86_64
+
+./tools/x64_iso.sh
+./tools/run-x86_64-qemu.sh

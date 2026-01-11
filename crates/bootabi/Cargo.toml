@@ -1,0 +1,10 @@
+[package]
+name = "bootabi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2"
+
+[lib]
+crate-type = ["rlib"]
