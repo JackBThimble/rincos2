@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 bootabi = { path = "../crates/bootabi"}
 bootloader_limine = {path = "../crates/bootloader/limine"}
+hal = {path = "../crates/hal"}
 
 spin = "0.10.0"
 bitflags = "2.10"
@@ -21,9 +22,3 @@ arch_aarch64 = {path = "../arch/aarch64", optional = true }
 x86_64 = ["dep:arch_x86_64"]
 aarch64 = ["dep:arch_aarch64"]
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-lto = true

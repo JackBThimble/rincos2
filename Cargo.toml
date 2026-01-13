@@ -4,8 +4,17 @@ members = [
   "kernel",
   "crates/bootabi",
   "crates/bootloader/limine",
+  "crates/hal",
   "arch/x86_64",
   "arch/aarch64",
 ]
 
 default-members = ["kernel"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1

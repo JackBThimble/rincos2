@@ -1,14 +1,16 @@
 #![no_std]
 #![no_main]
 
+mod arch;
 mod debug;
 mod drivers;
-mod hal;
+mod interrupts;
 mod kmain;
 mod log;
 mod panic;
+mod time;
 
-use bootabi::{Arch, BootInfo};
+use bootabi::{Arch, BOOTABI_MAGIC, BOOTABI_VERSION, BootHeader, BootInfo};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn kentry() -> ! {
@@ -18,13 +20,14 @@ pub extern "C" fn kentry() -> ! {
     }
     debug::early_serial::write_str("ENTER kentry\n");
 
-    let arch = if cfg!(target_arch = "x86_64") {
-        Arch::X86_64
-    } else {
-        Arch::Aarch64
-    };
+    #[cfg(target_arch = "x86_64")]
+    let arch = Arch::X86_64;
+    #[cfg(target_arch = "aarch64")]
+    let arch = Arch::Aarch64;
 
-    let boot: BootInfo<'static> = bootloader_limine::gather_bootinfo(arch, 1);
+    crate::debug::early_serial::write_str("set arch\n");
+
+    let boot: BootInfo = bootloader_limine::gather_bootinfo(arch, 1);
     crate::debug::early_serial::write_str("AFTER bootinfo\n");
 
     drivers::console::init(&boot);
@@ -32,29 +35,7 @@ pub extern "C" fn kentry() -> ! {
     klogln!("logger up");
     klogln!("arch={}", hal::ARCH_NAME);
     klogln!("hhdm={:#X}", boot.hhdm_offset);
-    klogln!("mem entries={}", boot.mem.entries.len());
+    klogln!("mem entries={}", boot.mem.entry_count);
 
     kmain::kmain(&boot)
 }
-
-// use core::sync::atomic::AtomicBool;
-
-// static BOOTED: AtomicBool = AtomicBool::new(false);
-//
-// #[unsafe(no_mangle)]
-// pub extern "C" fn kentry() -> ! {
-//     let arch = if cfg!(target_arch = "x86_64") {
-//         Arch::X86_64
-//     } else {
-//         Arch::Aarch64
-//     };
-//
-//     let boot: BootInfo<'static> = bootloader_limine::gather_bootinfo(arch, 1);
-//
-//     drivers::console::init(&boot);
-//     klogln!("bootloader = {:?}", boot.bootloader);
-//     klogln!("cmdline    = {:?}", boot.cmdline);
-//     klogln!("hhdm       = {:#X}", boot.hhdm_offset);
-//
-//     kmain::kmain(&boot)
-// }
