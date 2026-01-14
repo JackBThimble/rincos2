@@ -63,6 +63,7 @@ pub enum TranslateError {
 pub struct AddressSpace(NonNull<()>);
 
 unsafe impl Sync for AddressSpace {}
+unsafe impl Send for AddressSpace {}
 
 impl AddressSpace {
     pub const unsafe fn from_ptr(ptr: NonNull<()>) -> Self {
@@ -87,10 +88,17 @@ pub trait PageTableFrameAlloc {
 
 /// MMU backend contract implemented by each arch.
 pub trait Mmu {
+    /// Initialize MMU state from the currently active address space.
+    ///
+    /// This is typically called once during boot so future address spaces can
+    /// inherit required kernel mappings.
+    unsafe fn init_kernel(&self) -> Result<&'static mut AddressSpace, MapError>;
+
     /// Create a new address space that inherits required kernel mappings
     /// (e.g., higher-half kernel, HHDM if you keep it global).
     ///
     /// Arch may allocate page-table frames via `pt_alloc`.
+    /// `init_kernel` must have been called before this.
     unsafe fn address_space_new(
         &self,
         pt_alloc: &mut dyn PageTableFrameAlloc,

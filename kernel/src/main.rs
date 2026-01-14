@@ -11,6 +11,7 @@ mod kmain;
 mod log;
 mod panic;
 mod time;
+mod svc;
 
 use bootabi::BootInfo;
 

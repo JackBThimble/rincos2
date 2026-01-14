@@ -28,6 +28,16 @@ pub fn has_x2apic() -> bool {
     (ecx & (1 << 21)) != 0
 }
 
+/// CPUID.80000001H:EDX[20] NX bit support.
+pub fn has_nx() -> bool {
+    let (max_ext, _, _, _) = cpuid(0x8000_0000, 0);
+    if max_ext < 0x8000_0001 {
+        return false;
+    }
+    let (_, _, _, edx) = cpuid(0x8000_0001, 0);
+    (edx & (1 << 20)) != 0
+}
+
 /// Returns Some(tsc_hz) if available via CPUID, else None.
 /// Best source: CPUID.15H (TSC/crystal ratio + crystal Hz)
 /// Fallback: CPUID.16H base MHz (less reliable)

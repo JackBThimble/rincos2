@@ -74,12 +74,12 @@ static mut STRBUF_USED: usize = 0;
 
 #[inline(always)]
 unsafe fn membuf_mut() -> &'static mut [MemMapEntry; MAX_MEMMAP] {
-    &mut *core::ptr::addr_of_mut!(MEMBUF).cast::<[MemMapEntry; MAX_MEMMAP]>()
+    unsafe { &mut *core::ptr::addr_of_mut!(MEMBUF).cast::<[MemMapEntry; MAX_MEMMAP]>() }
 }
 
 #[inline(always)]
 unsafe fn strbuf_mut() -> &'static mut [u8; STRBUF_SIZE] {
-    &mut *core::ptr::addr_of_mut!(STRBUF).cast::<[u8; STRBUF_SIZE]>()
+    unsafe { &mut *core::ptr::addr_of_mut!(STRBUF).cast::<[u8; STRBUF_SIZE]>() }
 }
 
 #[repr(C)]

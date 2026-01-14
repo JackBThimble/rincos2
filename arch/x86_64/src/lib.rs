@@ -16,7 +16,7 @@ pub mod tsc;
 pub mod tss;
 
 use bootabi::BootInfo;
-use hal::{SerialWriter, mmu::Mmu};
+use hal::SerialWriter;
 
 struct Com1Writer;
 
@@ -74,12 +74,19 @@ unsafe fn enable_sse() {
 
 pub unsafe fn init(boot: &BootInfo) {
     unsafe {
-        HHDM_OFFSET = boot.hhdm_offset;
+        init_mmu(boot);
         init_core();
     }
     let has_time = init_time_source();
     unsafe {
         init_irqs(boot, has_time);
+    }
+}
+
+pub unsafe fn init_mmu(boot: &BootInfo) {
+    unsafe {
+        HHDM_OFFSET = boot.hhdm_offset;
+        mmu::init_features(false);
     }
 }
 
