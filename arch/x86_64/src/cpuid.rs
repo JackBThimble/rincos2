@@ -22,6 +22,12 @@ pub fn has_invariant_tsc() -> bool {
     (edx & (1 << 8)) != 0
 }
 
+/// CPUID.1H:ECX[21] x2APIC support
+pub fn has_x2apic() -> bool {
+    let (_, _, ecx, _) = cpuid(1, 0);
+    (ecx & (1 << 21)) != 0
+}
+
 /// Returns Some(tsc_hz) if available via CPUID, else None.
 /// Best source: CPUID.15H (TSC/crystal ratio + crystal Hz)
 /// Fallback: CPUID.16H base MHz (less reliable)

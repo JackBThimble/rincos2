@@ -92,10 +92,6 @@ isr_\vec:
 isr_\vec:
     // stack top is error_code already
     push \vec
-    // swap so layout becomes: vector, error_code, ...
-    mov rax, [rsp]
-    xchg rax, [rsp+8]
-    mov [rsp], rax
 
     EXC_COMMON
 .endm
@@ -161,6 +157,9 @@ IRQ 45
 IRQ 46
 IRQ 47
 
+// LAPIC timer vector (TSC-deadline)
+IRQ 224
+
 // Tables of handler addresses
 .section .rodata
 .align 8
@@ -173,4 +172,3 @@ isr_stub_table:
 irq_stub_table:
     .quad irq_32, irq_33, irq_34, irq_35, irq_36, irq_37, irq_38, irq_39
     .quad irq_40, irq_41, irq_42, irq_43, irq_44, irq_45, irq_46, irq_47
-

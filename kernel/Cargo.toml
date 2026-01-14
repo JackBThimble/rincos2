@@ -10,15 +10,8 @@ path = "src/main.rs"
 [dependencies]
 bootabi = { path = "../crates/bootabi"}
 bootloader_limine = {path = "../crates/bootloader/limine"}
+arch = { path = "../arch" }
 hal = {path = "../crates/hal"}
 
 spin = "0.10.0"
 bitflags = "2.10"
-
-arch_x86_64 = {path = "../arch/x86_64", optional = true}
-arch_aarch64 = {path = "../arch/aarch64", optional = true }
-
-[features]
-x86_64 = ["dep:arch_x86_64"]
-aarch64 = ["dep:arch_aarch64"]
-

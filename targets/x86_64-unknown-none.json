@@ -5,6 +5,7 @@
   "vendor": "unknown",
   "env": "",
   "executables": true,
+  "position-independent-executables": false,
   "linker-flavor": "ld.lld",
   "linker": "rust-lld",
   "panic-strategy": "abort",

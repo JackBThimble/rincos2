@@ -10,9 +10,7 @@ crate-type = ["rlib"]
 [dependencies]
 x86_64 = { version = "0.15", default-features = false }
 bootabi = {path = "../../crates/bootabi"}
-bootloader_limine = {path = "../../crates/bootloader/limine"}
 hal = {path = "../../crates/hal"}
 
 [build-dependencies]
 cc = "1"
-

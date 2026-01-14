@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "arch",
   "kernel",
   "crates/bootabi",
   "crates/bootloader/limine",

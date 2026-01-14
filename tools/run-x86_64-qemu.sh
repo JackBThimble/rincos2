@@ -5,7 +5,7 @@ OVMF_CODE=ovmf.fd
 OVMF_VARS=ovmf_vars.fd
 
 qemu-system-x86_64 \
-  -cpu qemu64 \
+  -cpu host,+invtsc \
   -enable-kvm \
   -m 1G \
   -smp 1 \

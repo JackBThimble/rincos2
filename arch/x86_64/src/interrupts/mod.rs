@@ -1,7 +1,6 @@
 use crate::apic;
 use crate::idt;
-use crate::tsc;
-use hal::interrupt::{IrqFrame, dispatch};
+use hal::interrupt::{dispatch, FaultKind, IrqFrame, IrqKind};
 
 #[repr(C)]
 pub struct ExceptionContext {
@@ -34,39 +33,70 @@ pub struct ExceptionContext {
 #[unsafe(no_mangle)]
 pub extern "C" fn exception_dispatch(ctx: *mut ExceptionContext) {
     let ctx = unsafe { &mut *ctx };
+    let vec = ctx.vector as u8;
+    let fault_kind = decode_fault_kind(vec);
+    let fault_addr = if fault_kind == FaultKind::PageFault {
+        read_cr2()
+    } else {
+        0
+    };
 
     dispatch(IrqFrame {
-        vector: ctx.vector as u8,
+        kind: IrqKind::Fault,
+        fault_kind,
+        irq: 0,
         error_code: ctx.error_code,
+        fault_addr,
     });
-
-    if ctx.vector == 14 {
-        let _cr2: u64;
-        unsafe { core::arch::asm!("mov {}, cr2", out(reg) _cr2) };
-    }
-
-    loop {
-        unsafe { core::arch::asm!("cli; hlt") }
-    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn irq_dispatch(ctx: *mut ExceptionContext) {
     let ctx = unsafe { &mut *ctx };
     let vec = ctx.vector as u8;
+    let kind = if vec == idt::TIMER_VEC {
+        IrqKind::Timer
+    } else {
+        IrqKind::External
+    };
 
     dispatch(IrqFrame {
-        vector: ctx.vector as u8,
+        kind,
+        fault_kind: FaultKind::None,
+        irq: irq_line(vec),
         error_code: ctx.error_code,
+        fault_addr: 0,
     });
-
-    if vec == idt::TIMER_VEC {
-        if let Some(ticks) = tsc::ticks_from_ns(10_000_000) {
-            tsc::set_deadline_after_ticks(ticks);
-        }
-    }
 
     unsafe {
         apic::eoi();
+    }
+}
+
+#[inline(always)]
+fn read_cr2() -> u64 {
+    unsafe {
+        let v: u64;
+        core::arch::asm!("mov {}, cr2", out(reg) v, options(nomem, nostack, preserves_flags));
+        v
+    }
+}
+
+fn decode_fault_kind(vec: u8) -> FaultKind {
+    match vec {
+        0 => FaultKind::DivideByZero,
+        6 => FaultKind::InvalidOpcode,
+        8 => FaultKind::DoubleFault,
+        13 => FaultKind::GeneralProtection,
+        14 => FaultKind::PageFault,
+        _ => FaultKind::Unknown,
+    }
+}
+
+fn irq_line(vec: u8) -> u16 {
+    if (32..48).contains(&vec) {
+        (vec - 32) as u16
+    } else {
+        0
     }
 }

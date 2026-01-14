@@ -32,6 +32,7 @@ SECTIONS {
 
   .bss : { 
     *(.bss .bss.*) 
+    *(.bss.boot .bss.boot.*)
     *(COMMON) 
   } : data 
 

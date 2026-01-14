@@ -3,15 +3,25 @@
 version = 4
 
 [[package]]
+name = "arch"
+version = "0.1.0"
+dependencies = [
+ "arch_aarch64",
+ "arch_x86_64",
+]
+
+[[package]]
 name = "arch_aarch64"
 version = "0.1.0"
+dependencies = [
+ "bootabi",
+]
 
 [[package]]
 name = "arch_x86_64"
 version = "0.1.0"
 dependencies = [
  "bootabi",
- "bootloader_limine",
  "cc",
  "hal",
  "x86_64",
@@ -77,8 +87,7 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
- "arch_aarch64",
- "arch_x86_64",
+ "arch",
  "bitflags",
  "bootabi",
  "bootloader_limine",

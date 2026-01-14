@@ -18,6 +18,47 @@ pub enum Arch {
     Aarch64 = 2,
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BootMode {
+    Unknown = 0,
+    Bios = 1,
+    Uefi = 2,
+}
+
+impl BootMode {
+    pub const fn from_raw(raw: u8) -> BootMode {
+        match raw {
+            1 => BootMode::Bios,
+            2 => BootMode::Uefi,
+            _ => BootMode::Unknown,
+        }
+    }
+
+    pub const fn as_raw(self) -> u8 {
+        self as u8
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimineBaseRevision {
+    Unknown = 0,
+    Rev0 = 1,
+    Rev1 = 2,
+    Rev2 = 3,
+    Rev3 = 4,
+    Rev4 = 5,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BootloaderRevision {
+    /// Packed Limine revision:
+    /// (major << 32) | (minor << 16) | patch
+    pub packed: u64,
+}
+
 /// Pointer to bytes in memory
 /// physical pointer + length
 #[repr(C)]
@@ -121,7 +162,8 @@ pub struct BootInfo {
 
     // Identity
     pub arch: Arch,
-    pub _pad0: [u8; 3],
+    pub boot_mode: u8,
+    pub _pad0: [u8; 2],
 
     pub cpu_count: u32,
 
@@ -148,6 +190,7 @@ pub struct BootInfo {
     /// Bootloader name/version bytes (optional)
     pub bootloader: ByteSpan,
 
+    /// Base revision
     pub boot_flags: u32,
     pub _pad2: u32,
 }
