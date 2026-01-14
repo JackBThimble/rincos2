@@ -1,4 +1,4 @@
-use crate::util::SyncUnsafeCell;
+use core::cell::SyncUnsafeCell;
 
 #[repr(C, align(16))]
 pub struct Tss64 {

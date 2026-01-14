@@ -58,7 +58,11 @@ pub enum TranslateError {
 /// An opaque handle to an address space root.
 ///
 /// Opaque to kernel: backed by an arch-owned object;
+#[repr(transparent)]
+#[derive(Clone, Copy)]
 pub struct AddressSpace(NonNull<()>);
+
+unsafe impl Sync for AddressSpace {}
 
 impl AddressSpace {
     pub const unsafe fn from_ptr(ptr: NonNull<()>) -> Self {
@@ -144,5 +148,5 @@ pub trait Mmu {
     /// Returns the currently active address space for this CPU.
     ///
     /// Arch may track this in CPU-local storage (still within arch).
-    fn current(&self) -> &'static AddressSpace;
+    fn current(&self) -> AddressSpace;
 }

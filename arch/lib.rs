@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(sync_unsafe_cell)]
 
 #[cfg(target_arch = "x86_64")]
 pub use arch_x86_64::*;

@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(x86_amx_intrinsics)]
+#![feature(sync_unsafe_cell)]
 
 pub const ARCH_NAME: &str = "x86_64";
 
@@ -13,10 +14,9 @@ pub mod msr;
 pub mod serial;
 pub mod tsc;
 pub mod tss;
-mod util;
 
 use bootabi::BootInfo;
-use hal::SerialWriter;
+use hal::{SerialWriter, mmu::Mmu};
 
 struct Com1Writer;
 
@@ -27,6 +27,12 @@ impl SerialWriter for Com1Writer {
 }
 
 static COM1_WRITER: Com1Writer = Com1Writer;
+static mut HHDM_OFFSET: u64 = 0;
+
+#[inline(always)]
+pub(crate) fn hhdm_offset() -> u64 {
+    unsafe { HHDM_OFFSET }
+}
 
 pub fn early_init() {
     disable_interrupts();
@@ -68,6 +74,7 @@ unsafe fn enable_sse() {
 
 pub unsafe fn init(boot: &BootInfo) {
     unsafe {
+        HHDM_OFFSET = boot.hhdm_offset;
         init_core();
     }
     let has_time = init_time_source();
@@ -146,4 +153,9 @@ pub fn disable_interrupts() {
 
 pub fn enable_interrupts() {
     unsafe { core::arch::asm!("sti", options(nomem, nostack, preserves_flags)) }
+}
+
+/// MMU backend
+pub fn mmu() -> &'static mmu::X86Mmu {
+    &mmu::MMU
 }

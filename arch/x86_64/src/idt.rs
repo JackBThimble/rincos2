@@ -1,5 +1,5 @@
-use crate::util::SyncUnsafeCell;
 use core::arch::asm;
+use core::cell::SyncUnsafeCell;
 
 #[repr(C, packed)]
 struct Idtr {

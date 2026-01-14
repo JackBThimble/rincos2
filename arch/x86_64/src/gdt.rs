@@ -2,7 +2,7 @@ use core::arch::asm;
 use core::mem::size_of;
 
 use crate::tss;
-use crate::util::SyncUnsafeCell;
+use core::cell::SyncUnsafeCell;
 
 #[repr(C, packed)]
 struct Gdtr {
@@ -81,9 +81,7 @@ pub unsafe fn build_gdt_tss(rsp0_top: u64) {
 }
 
 pub unsafe fn init_tss_only(rsp0_top: u64) {
-    unsafe {
-        tss::init_tss(rsp0_top);
-    }
+    tss::init_tss(rsp0_top);
 }
 
 pub unsafe fn build_gdt_entries_only() {
@@ -140,43 +138,49 @@ fn is_canonical(addr: u64) -> bool {
 }
 
 pub unsafe fn load_gdt() {
-    const GDT_BYTES: usize = core::mem::size_of::<GdtEntry>() * 3
-        + core::mem::size_of::<TssDesc>();
-    let gdtr = Gdtr {
-        limit: (GDT_BYTES - 1) as u16,
-        base: (&raw const FULL as *const _ as u64),
-    };
+    unsafe {
+        const GDT_BYTES: usize =
+            core::mem::size_of::<GdtEntry>() * 3 + core::mem::size_of::<TssDesc>();
+        let gdtr = Gdtr {
+            limit: (GDT_BYTES - 1) as u16,
+            base: (&raw const FULL as *const _ as u64),
+        };
 
-    asm!("lgdt [{}]", in(reg) &gdtr, options(readonly, nostack));
+        asm!("lgdt [{}]", in(reg) &gdtr, options(readonly, nostack));
+    }
 }
 
 pub unsafe fn reload_segments() {
-    // Reload segment registers (CS needs far jump)
-    asm!(
-        "push {cs}",
-        "lea rax, [rip + 2f]",
-        "push rax",
-        "retfq",
-        "2:",
-        cs = const KERNEL_CS,
-        options(preserves_flags)
-    );
+    unsafe {
+        // Reload segment registers (CS needs far jump)
+        asm!(
+            "push {cs}",
+            "lea rax, [rip + 2f]",
+            "push rax",
+            "retfq",
+            "2:",
+            cs = const KERNEL_CS,
+            options(preserves_flags)
+        );
 
-    asm!(
-        "mov ax, {ds}",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov ss, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        ds = const KERNEL_DS,
-        options(nostack)
-    );
+        asm!(
+            "mov ax, {ds}",
+            "mov ds, ax",
+            "mov es, ax",
+            "mov ss, ax",
+            "mov fs, ax",
+            "mov gs, ax",
+            ds = const KERNEL_DS,
+            options(nostack)
+        );
+    }
 }
 
 pub unsafe fn load_tss() {
-    // Selector points to the TSS descriptor in FULL after 3 entries => 0x18
-    asm!("ltr ax", in("ax") TSS_SEL, options(nostack));
+    unsafe {
+        // Selector points to the TSS descriptor in FULL after 3 entries => 0x18
+        asm!("ltr ax", in("ax") TSS_SEL, options(nostack));
+    }
 }
 
 pub unsafe fn init_gdt_and_tss(rsp0_top: u64) {
