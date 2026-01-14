@@ -8,6 +8,7 @@ pub mod cpuid;
 pub mod gdt;
 pub mod idt;
 pub mod interrupts;
+pub mod mmu;
 pub mod msr;
 pub mod serial;
 pub mod tsc;
@@ -44,18 +45,25 @@ pub fn early_init() {
 unsafe fn enable_sse() {
     let mut cr0: u64;
     let mut cr4: u64;
-    core::arch::asm!("mov {}, cr0", out(reg) cr0, options(nomem, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("mov {}, cr0", out(reg) cr0, options(nomem, nostack, preserves_flags));
+    }
     // Enable FPU/SSE: clear EM/TS, set MP/NE.
     cr0 &= !(1 << 2); // EM
     cr0 &= !(1 << 3); // TS
     cr0 |= 1 << 1; // MP
     cr0 |= 1 << 5; // NE
-    core::arch::asm!("mov cr0, {}", in(reg) cr0, options(nomem, nostack, preserves_flags));
-
-    core::arch::asm!("mov {}, cr4", out(reg) cr4, options(nomem, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("mov cr0, {}", in(reg) cr0, options(nomem, nostack, preserves_flags));
+    }
+    unsafe {
+        core::arch::asm!("mov {}, cr4", out(reg) cr4, options(nomem, nostack, preserves_flags));
+    }
     cr4 |= 1 << 9; // OSFXSR
     cr4 |= 1 << 10; // OSXMMEXCPT
-    core::arch::asm!("mov cr4, {}", in(reg) cr4, options(nomem, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("mov cr4, {}", in(reg) cr4, options(nomem, nostack, preserves_flags));
+    }
 }
 
 pub unsafe fn init(boot: &BootInfo) {
@@ -70,73 +78,35 @@ pub unsafe fn init(boot: &BootInfo) {
 
 pub unsafe fn init_core() {
     unsafe {
-        init_core_stage1a();
-        init_core_stage1b1();
-        init_core_stage1b2();
-        init_core_stage1c();
-        init_core_stage2();
-        init_core_stage3();
-        init_core_stage4();
-        init_core_stage5();
-        init_core_stage6();
-    }
-}
-
-pub unsafe fn init_core_stage1a() {
-    let rsp0_top = current_rsp();
-    unsafe {
-        gdt::init_tss_only(rsp0_top);
-    }
-}
-
-pub unsafe fn init_core_stage1b1() {
-    unsafe {
-        gdt::build_gdt_entries_only();
-    }
-}
-
-pub unsafe fn init_core_stage1b2() {
-    // no-op: TSS descriptor built in stage6
-}
-
-pub unsafe fn init_core_stage1c() {
-    unsafe {
-        gdt::build_full_table();
-    }
-}
-
-pub unsafe fn init_core_stage2() {
-    unsafe {
-        gdt::load_gdt();
-    }
-}
-
-pub unsafe fn init_core_stage3() {
-    unsafe {
-        gdt::reload_segments();
-    }
-}
-
-pub unsafe fn init_core_stage4() {
-    unsafe {
+        let rsp0_top = current_rsp();
+        init_gdt_and_segments(rsp0_top);
         idt::init_idt();
-    }
-}
-
-pub unsafe fn init_core_stage5() {
-    pic_mask_all();
-}
-
-pub unsafe fn init_core_stage6() {
-    unsafe {
-        gdt::build_tss_desc();
-        gdt::build_full_table();
-        gdt::load_tss();
+        mask_legacy_pic();
+        // Build the TSS descriptor after IDT/handlers are live.
+        load_tss();
     }
 }
 
 pub fn init_time_source() -> bool {
     tsc::init()
+}
+
+unsafe fn init_gdt_and_segments(rsp0_top: u64) {
+    unsafe {
+        gdt::init_tss_only(rsp0_top);
+        gdt::build_gdt_entries_only();
+        gdt::build_full_table();
+        gdt::load_gdt();
+        gdt::reload_segments();
+    }
+}
+
+unsafe fn load_tss() {
+    unsafe {
+        gdt::build_tss_desc();
+        gdt::build_full_table();
+        gdt::load_tss();
+    }
 }
 
 pub unsafe fn init_irqs(boot: &BootInfo, has_time: bool) -> bool {
@@ -156,7 +126,7 @@ fn current_rsp() -> u64 {
     }
 }
 
-fn pic_mask_all() {
+fn mask_legacy_pic() {
     const PIC1_DATA: u16 = 0x21;
     const PIC2_DATA: u16 = 0xa1;
 

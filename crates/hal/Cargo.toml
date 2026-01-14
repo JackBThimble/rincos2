@@ -8,3 +8,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 bootabi = {path = "../bootabi"}
+bitflags = "2"
