@@ -6,7 +6,7 @@ use hal::mmu::{
     AddressSpace, MapError, MapFlags, Mmu, PageTableFrameAlloc, PhysAddr, TranslateError, VirtAddr,
 };
 
-use crate::{cpuid, hhdm_offset, msr};
+use crate::{apic, cpuid, hhdm_offset, idt, msr};
 
 pub struct X86Mmu;
 
@@ -22,7 +22,10 @@ struct X86AddressSpace {
 
 static KAS: SyncUnsafeCell<Option<X86AddressSpace>> = SyncUnsafeCell::new(None);
 static KAS_HANDLE: SyncUnsafeCell<Option<AddressSpace>> = SyncUnsafeCell::new(None);
-static CURRENT: SyncUnsafeCell<Option<AddressSpace>> = SyncUnsafeCell::new(None);
+
+const MAX_CPUS: usize = 256;
+static CURRENT_PER_CPU: SyncUnsafeCell<[Option<AddressSpace>; MAX_CPUS]> =
+    SyncUnsafeCell::new([None; MAX_CPUS]);
 
 const MAX_ADDRESS_SPACES: usize = 64;
 
@@ -43,6 +46,7 @@ const PTE_NX: u64 = 1 << 63;
 
 const CR0_WP: u64 = 1 << 16;
 const CR4_PGE: u64 = 1 << 7;
+const EFER_LMA: u64 = 1 << 10;
 const EFER_NXE: u64 = 1 << 11;
 
 static NXE_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -69,6 +73,28 @@ static AS_SLOTS: SyncUnsafeCell<[AddressSpaceSlot; MAX_ADDRESS_SPACES]> =
 #[inline(always)]
 fn aligned_4k(x: u64) -> bool {
     (x & (PAGE_SIZE - 1)) == 0
+}
+
+#[inline(always)]
+fn cpu_index() -> usize {
+    let id = apic::cpu_id() as usize;
+    if id < MAX_CPUS {
+        id
+    } else {
+        0
+    }
+}
+
+#[inline(always)]
+unsafe fn current_slot_mut() -> &'static mut Option<AddressSpace> {
+    let idx = cpu_index();
+    unsafe { &mut (*CURRENT_PER_CPU.get())[idx] }
+}
+
+#[inline(always)]
+unsafe fn current_slot() -> Option<AddressSpace> {
+    let idx = cpu_index();
+    unsafe { (*CURRENT_PER_CPU.get())[idx] }
 }
 
 #[inline(always)]
@@ -118,6 +144,29 @@ unsafe fn read_cr3() -> u64 {
     v
 }
 
+#[inline(always)]
+unsafe fn flush_tlb_all_global() {
+    let mut cr4: u64;
+    unsafe {
+        core::arch::asm!("mov {}, cr4", out(reg) cr4, options(nostack, nomem, preserves_flags));
+    }
+
+    if (cr4 & CR4_PGE) != 0 {
+        let cr4_no_pge = cr4 & !CR4_PGE;
+        unsafe {
+            core::arch::asm!("mov cr4, {}", in(reg) cr4_no_pge, options(nostack, nomem, preserves_flags));
+            let cr3 = read_cr3();
+            core::arch::asm!("mov cr3, {}", in(reg) cr3, options(nostack, nomem, preserves_flags));
+            core::arch::asm!("mov cr4, {}", in(reg) cr4, options(nostack, nomem, preserves_flags));
+        }
+    } else {
+        unsafe {
+            let cr3 = read_cr3();
+            core::arch::asm!("mov cr3, {}", in(reg) cr3, options(nostack, nomem, preserves_flags));
+        }
+    }
+}
+
 pub unsafe fn init_features(enable_nx: bool) {
     let mut cr0: u64;
     let mut cr4: u64;
@@ -137,14 +186,33 @@ pub unsafe fn init_features(enable_nx: bool) {
     let mut nxe = false;
     if enable_nx && cpuid::has_nx() {
         let mut efer = unsafe { msr::rdmsr(msr::IA32_EFER) };
-        efer |= EFER_NXE;
-        unsafe {
-            msr::wrmsr(msr::IA32_EFER, efer);
+        if (efer & EFER_NXE) == 0 {
+            efer |= EFER_NXE;
+            efer &= !EFER_LMA;
+            unsafe {
+                msr::wrmsr(msr::IA32_EFER, efer);
+            }
         }
-        nxe = true;
+        nxe = (efer & EFER_NXE) != 0;
     }
 
     NXE_ENABLED.store(nxe, Ordering::Relaxed);
+}
+
+pub unsafe fn enable_nx() -> Result<(), MapError> {
+    if nxe_enabled() {
+        return Ok(());
+    }
+    if !cpuid::has_nx() {
+        return Ok(());
+    }
+
+    unsafe {
+        init_features(true);
+        flush_tlb_all_global();
+    }
+
+    Ok(())
 }
 
 #[inline(always)]
@@ -241,6 +309,11 @@ unsafe fn free_slot(aspace: &AddressSpace) {
     }
 }
 
+pub(crate) fn handle_tlb_shootdown() {
+    // TODO: page-granular shootdown; full flush is safe for now.
+    MMU.flush_tlb_all();
+}
+
 fn as_x86(aspace: &AddressSpace) -> &'static X86AddressSpace {
     let ptr = aspace.as_ptr().as_ptr() as *const X86AddressSpace;
     unsafe { &*ptr }
@@ -271,7 +344,7 @@ impl Mmu for X86Mmu {
             *KAS_HANDLE.get() = Some(AddressSpace::from_ptr(handle_ptr));
             let h: &'static mut AddressSpace = (*KAS_HANDLE.get()).as_mut().unwrap();
 
-            *CURRENT.get() = Some(*h);
+            *current_slot_mut() = Some(*h);
 
             Ok(h)
         }
@@ -536,7 +609,7 @@ impl Mmu for X86Mmu {
         unsafe {
             core::arch::asm!("mov cr3, {}", in(reg) cr3, options(nostack, nomem, preserves_flags));
 
-            *CURRENT.get() = Some(*aspace);
+            *current_slot_mut() = Some(*aspace);
         }
     }
 
@@ -554,10 +627,17 @@ impl Mmu for X86Mmu {
         }
     }
 
+    fn shootdown_tlb_page(&self, vaddr: VirtAddr) {
+        self.flush_tlb_page(vaddr);
+        apic::send_ipi_all_others(idt::TLB_SHOOTDOWN_VEC);
+    }
+
+    fn shootdown_tlb_all(&self) {
+        self.flush_tlb_all();
+        apic::send_ipi_all_others(idt::TLB_SHOOTDOWN_VEC);
+    }
+
     fn current(&self) -> AddressSpace {
-        unsafe {
-            let cur = (*CURRENT.get()).expect("MMU not initialized");
-            cur
-        }
+        unsafe { current_slot().expect("MMU not initialized") }
     }
 }

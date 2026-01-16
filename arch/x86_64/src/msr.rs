@@ -2,7 +2,7 @@ use core::arch::asm;
 
 pub const IA32_TSC_DEADLINE: u32 = 0x0000_06e0;
 pub const IA32_APIC_BASE: u32 = 0x1b;
-pub const IA32_EFER: u32 = 0xc000_0000;
+pub const IA32_EFER: u32 = 0xc000_0080;
 pub const IA32_STAR: u32 = 0xc000_0081;
 pub const IA32_LSTAR: u32 = 0xc000_0082;
 pub const IA32_FMASK: u32 = 0xc000_0084;

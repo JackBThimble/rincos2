@@ -41,9 +41,11 @@ unsafe extern "C" {
     static irq_stub_table: [u64; 16];
 
     fn irq_224();
+    fn irq_225();
 }
 
 pub const TIMER_VEC: u8 = 0xe0;
+pub const TLB_SHOOTDOWN_VEC: u8 = 0xe1;
 
 pub unsafe fn init_idt() {
     // Exceptions 0..31
@@ -65,6 +67,7 @@ pub unsafe fn init_idt() {
 
         // Install LAPIC timer vector (TSC-deadline)
         set_gate(TIMER_VEC, irq_224 as *const () as u64, 0);
+        set_gate(TLB_SHOOTDOWN_VEC, irq_225 as *const () as u64, 0);
 
         let idtr = Idtr {
             limit: (core::mem::size_of_val(&IDT) - 1) as u16,

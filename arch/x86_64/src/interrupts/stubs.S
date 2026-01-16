@@ -159,6 +159,8 @@ IRQ 47
 
 // LAPIC timer vector (TSC-deadline)
 IRQ 224
+// TLB shootdown IPI
+IRQ 225
 
 // Tables of handler addresses
 .section .rodata

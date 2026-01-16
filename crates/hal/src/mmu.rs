@@ -153,6 +153,20 @@ pub trait Mmu {
     /// Full TLB flush on current CPU.
     fn flush_tlb_all(&self);
 
+    /// Request a TLB shootdown for a single page on all CPUs.
+    ///
+    /// Default: local flush only.
+    fn shootdown_tlb_page(&self, vaddr: VirtAddr) {
+        self.flush_tlb_page(vaddr);
+    }
+
+    /// Request a full TLB shootdown on all CPUs.
+    ///
+    /// Default: local flush only.
+    fn shootdown_tlb_all(&self) {
+        self.flush_tlb_all();
+    }
+
     /// Returns the currently active address space for this CPU.
     ///
     /// Arch may track this in CPU-local storage (still within arch).

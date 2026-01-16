@@ -123,6 +123,10 @@ pub fn init(boot: &BootInfo) {
             .init_kernel()
             .expect("vm: mmu kernel init failed");
     }
+
+    unsafe {
+        crate::arch::mmu::enable_nx().expect("vm: enable NX failed");
+    }
 }
 
 pub fn new_address_space() -> Result<&'static mut AddressSpace, MapError> {

@@ -1,5 +1,6 @@
 use crate::apic;
 use crate::idt;
+use crate::mmu;
 use hal::interrupt::{dispatch, FaultKind, IrqFrame, IrqKind};
 
 #[repr(C)]
@@ -54,6 +55,13 @@ pub extern "C" fn exception_dispatch(ctx: *mut ExceptionContext) {
 pub extern "C" fn irq_dispatch(ctx: *mut ExceptionContext) {
     let ctx = unsafe { &mut *ctx };
     let vec = ctx.vector as u8;
+    if vec == idt::TLB_SHOOTDOWN_VEC {
+        mmu::handle_tlb_shootdown();
+        unsafe {
+            apic::eoi();
+        }
+        return;
+    }
     let kind = if vec == idt::TIMER_VEC {
         IrqKind::Timer
     } else {

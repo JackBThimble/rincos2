@@ -13,11 +13,14 @@ const LAPIC_EOI: u32 = 0x0b0;
 const LAPIC_SVR: u32 = 0x0f0;
 const LAPIC_LVT_TIMER: u32 = 0x320;
 const LAPIC_TIMER_DIV: u32 = 0x3e0;
+const LAPIC_ICR_LOW: u32 = 0x300;
+const LAPIC_ICR_HIGH: u32 = 0x310;
 
 const SVR_APIC_ENABLE: u32 = 1 << 8;
 
 const LVT_MASKED: u32 = 1 << 16;
 const LVT_MODE_TSC_DEADLINE: u32 = 0b10 << 17;
+const ICR_DELIVERY_PENDING: u32 = 1 << 12;
 
 const APIC_MODE_NONE: u8 = 0;
 const APIC_MODE_XAPIC: u8 = 1;
@@ -66,6 +69,37 @@ pub unsafe fn init(hhdm_offset: u64) -> bool {
         let _id = read(LAPIC_ID);
     }
     true
+}
+
+pub fn cpu_id() -> u32 {
+    unsafe {
+        let id = read(LAPIC_ID);
+        match APIC_MODE {
+            APIC_MODE_XAPIC => id >> 24,
+            APIC_MODE_X2APIC => id,
+            _ => 0,
+        }
+    }
+}
+
+pub fn send_ipi_all_others(vector: u8) {
+    unsafe {
+        if APIC_MODE == APIC_MODE_NONE {
+            return;
+        }
+    }
+
+    let icr = (vector as u32) | (0b11 << 18);
+
+    unsafe {
+        if APIC_MODE == APIC_MODE_XAPIC {
+            write(LAPIC_ICR_HIGH, 0);
+            write(LAPIC_ICR_LOW, icr);
+            while (read(LAPIC_ICR_LOW) & ICR_DELIVERY_PENDING) != 0 {}
+        } else {
+            write(LAPIC_ICR_LOW, icr);
+        }
+    }
 }
 
 #[inline(always)]
